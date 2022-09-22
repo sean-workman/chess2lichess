@@ -36,10 +36,20 @@ options:
                         import chess.com games from the specified month to lichess.org
   -r YYYY/MM YYYY/MM, --range YYYY/MM YYYY/MM
                         import chess.com games from months in the specified range to lichess.org
+  -f [TYPE ...], --filter [TYPE ...]
+                        filter which game types are imported - space separated
 ```
 
-## Example
+## Examples
 
 `python chess2lichess.py hikaru -v -m 2022/08`
 
 The above command would fetch and import all 363 games that GM Hikaru played on chess.com in the month of August 2022 and let you know about the progress as it goes.
+
+`python chess2lichess.py hikaru -v -m 2022/08 -f blitz`
+
+The above command would fetch and import all 238 blitz games that GM Hikaru played on chess.com in the month of August 2022 and let you know about the progress as it goes.
+
+`python chess2lichess.py hikaru -v -m 2022/08 -f blitz bullet`
+
+The above command would fetch and import all 238 blitz games and 83 bullet games that GM Hikaru played on chess.com in the month of August 2022 and let you know about the progress as it goes.
