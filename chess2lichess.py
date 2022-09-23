@@ -1,5 +1,8 @@
 import argparse
+from calendar import monthrange
+import csv
 from datetime import date, datetime
+from dateutil import tz
 from dateutil.relativedelta import relativedelta
 import os
 import re
@@ -16,13 +19,69 @@ LICHESS_TOKEN = os.getenv("LICHESS_TOKEN")
 # Dictionary for filter game type
 TIME_CONTROL = {"rapid": "600", "blitz": "180", "bullet": "60"}
 
+# Creates the regex pattern used downstream to pull out the individual pieces
+# of information to store in the local "database".
+TAGS = [
+    "(?s)",
+    '(White "(?P<white>\S+)")',
+    '(Black "(?P<black>\S+)")',
+    '(UTCDate "(?P<date>\d+.\d+.\d+)")',
+    '(UTCTime "(?P<time>\d+:\d+:\d+)")',
+    '(WhiteElo "(?P<white_elo>\d+)")',
+    '(BlackElo "(?P<black_elo>\d+)")',
+    '(TimeControl "(?P<time_control>\d+[\+\d+]{0,3})")',
+    '(Termination "(?P<termination>(\S+\s){,10}\w+)")',
+    "(Link .+/live/(?P<game_id>\d+))",
+]
+
+TAG_PATTERN = re.compile(".+".join(TAGS))
+
+# Creating variables for downstream timezone correction
+UTC_ZONE = tz.tzutc()
+LOCAL_ZONE = tz.tzlocal()
+
 # ------------------------------------CLASS------------------------------------#
 
 
 class Chess2Lichess:
-    def __init__(self, username, verbose) -> None:
+    def __init__(self, username, verbose, convert_local) -> None:
         self.username = username
         self.verbose = verbose
+        self.convert_local = convert_local
+
+    def check_db_existence(self) -> None:
+        """
+        Check if .csv "database" exists and creates it if not
+        """
+        if not os.path.exists("pgn_database.csv"):
+            with open("pgn_database.csv", "wt") as database:
+                print("Created local 'database' named pgn_database.csv in the current directory")
+                writer = csv.writer(database)
+                writer.writerow(
+                    [
+                        "game_id",
+                        "game_date",
+                        "game_time",
+                        "white",
+                        "white_elo",
+                        "black",
+                        "black_elo",
+                        "time_control",
+                        "termination",
+                    ]
+                )
+
+    def convert_utc_to_local(self, date, time):
+        """
+        Takes in the UTC date and time as written in the PGN text fetched from the
+        chess.com server, returns a tuple of date and time as string with the
+        formatting (YYYY/MM/DD, HH:MM:SS).
+        """
+        utc = datetime.strptime(f"{date} {time}", "%Y.%m.%d %H:%M:%S")
+        utc = utc.replace(tzinfo=UTC_ZONE)
+        local = utc.astimezone(LOCAL_ZONE)
+        date, time = datetime.strftime(local, "%Y/%m/%d %H:%M:%S").split()
+        return date, time
 
     def fetch_current_month(self) -> list:
         """
@@ -60,7 +119,7 @@ class Chess2Lichess:
         pgn_list = pgns.split("\n\n\n")
         return pgn_list
 
-    def fetch_range(self, start_in: str, end_in: str) -> str:
+    def fetch_range(self, start_in: str, end_in: str) -> list:
         """
         Uses the requests library to fetch the raw multi-game PGN text for
         games played in the specified month. Returns a UTF-8 encoded string.
@@ -71,13 +130,11 @@ class Chess2Lichess:
         end_year, end_month = end_in.split("/")
         start = date(int(start_year), int(start_month), 1)
         end = date(int(end_year), int(end_month), 1)
-
         while start <= end:
             month_list.append(start)
             start += relativedelta(months=1)
 
-        pgn_accumulator = []
-
+        pgn_accumulator = ""
         for m in month_list:
             url = f"https://api.chess.com/pub/player/{self.username}/games/{m.year}/{m.month:02d}/pgn"
             headers = {
@@ -86,9 +143,12 @@ class Chess2Lichess:
             }
             response = requests.get(url=url, headers=headers)
             response.raise_for_status()
-            pgn_accumulator.append(response.text)
+            pgn_accumulator += response.text.rstrip()
+            pgn_accumulator += "\n\n\n"
+        
+        pgn_list = pgn_accumulator.rstrip("\n\n\n").split("\n\n\n")
 
-        return pgn_accumulator
+        return pgn_list
 
     def filter_pgns(self, pgn_list: list, game_types: str) -> list:
         """
@@ -103,9 +163,66 @@ class Chess2Lichess:
             if re.search(tc_pattern, pgn).group(1).split("+")[0] in durations:
                 filtered_pgn_list.append(pgn)
         if not filtered_pgn_list:
-            print("There are no games that pass the filter!")
+            print("There are no games that pass your filter!")
+            exit(1)
         else:
             return filtered_pgn_list
+
+    def check_already_imported(self, fetched_pgns:list) -> list:
+        """
+        Check local monthly PGN text document to see which games have already
+        been imported. Return a sanitized list of PGNs that have not yet been
+        imported.
+        """
+        with open("pgn_database.csv", "r+") as file:
+            reader = csv.reader(file)
+            current_ids = [row[0] for row in reader]
+        print(f"{len(fetched_pgns)} games requested for import")
+        if len(current_ids) > 1:
+            unseen_pgns = [pgn for pgn in fetched_pgns if re.search(TAG_PATTERN, pgn).group("game_id") not in current_ids]
+            dont_import = len(fetched_pgns)-len(unseen_pgns)
+        else:
+            unseen_pgns = fetched_pgns
+            dont_import = 0
+        if not unseen_pgns:
+            print("All requested games have already been imported!")
+            exit(1)
+        else:
+            if self.verbose:
+                print(f"{dont_import} of the {len(fetched_pgns)} requested games have already been imported")
+            return unseen_pgns
+
+    def update_db(self, pgns) -> None:
+        """
+        Update the local .csv "database" with PGN tags for each game being imported.
+        """
+        with open("pgn_database.csv", "a+") as database:
+            writer = csv.writer(database)
+            for pgn in pgns:
+                tags = re.search(TAG_PATTERN, pgn)
+                game_id = tags.group("game_id")
+                if self.convert_local:
+                    game_date, game_time = self.convert_utc_to_local(tags.group("date"), tags.group("time"))
+                else:
+                    game_date, game_time = (tags.group("date"), tags.group("time"))
+                white = tags.group("white")
+                white_elo = tags.group("white_elo")
+                black_elo = tags.group("black_elo")
+                black = tags.group("black")
+                time_control = tags.group("time_control")
+                termination = tags.group("termination")
+
+                writer.writerow(
+            [game_id, game_date, game_time, white, white_elo, black, black_elo, time_control, termination]
+        )
+
+    def update_local_pgns(self, pgns) -> None:
+        """
+        Update the local PGN text document with each game being imported.
+        """
+        with open("local_pgns.txt", "a+") as file:
+            for pgn in pgns:
+                file.write(pgn+"\n\n\n")
 
     def import_pgns(self, pgn_list: list) -> None:
         """
@@ -129,8 +246,8 @@ class Chess2Lichess:
             games_imported += 1
             if self.verbose:
                 print(f"Imported {games_imported}/{n_games}")
-            if games_imported != n_games:
-                sleep(7.5)
+            # if games_imported != n_games:
+            #     sleep(7.5)
         if self.verbose:
             print("Finished importing games from chess.com")
 
@@ -152,6 +269,22 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help="show information about number of games and progress",
+    )
+
+    parser.add_argument(
+        "-f",
+        "--filter",
+        nargs="*",
+        help="filter which game types are imported - space separated",
+        metavar="TYPE",
+    )
+
+    parser.add_argument(
+        "-u",
+        "--utc",
+        action="store_false",
+        default=True,
+        help="stop the script from convert date/time from UTC to local timezone"
     )
 
     modes = parser.add_mutually_exclusive_group(required=True)
@@ -176,27 +309,30 @@ if __name__ == "__main__":
         help="import chess.com games from months in the specified range to lichess.org",
     )
 
-    parser.add_argument(
-        "-f",
-        "--filter",
-        nargs="*",
-        help="filter which game types are imported - space separated",
-        metavar="TYPE",
-    )
-
     args = parser.parse_args()
 
-    c2l = Chess2Lichess(args.username, args.verbose)
+    # Instantiate Chess2Liches object
+    c2l = Chess2Lichess(args.username, args.verbose, convert_local=args.utc)
 
+    # Check for existence of 'database', create if necessary
+    c2l.check_db_existence()
+
+    # Fetch requested PGNs
     if args.current:
         pgns = c2l.fetch_current_month()
     elif args.month:
         pgns = c2l.fetch_month(args.month[0])
     elif args.range:
         pgns = c2l.fetch_range(args.range[0], args.range[1])
-
+    # Filter PGNs on time control if requested
     if args.filter:
         pgns = c2l.filter_pgns(pgns, args.filter)
 
-    if pgns:
-        c2l.import_pgns(pgns)
+    # Check to see which PGNs have already been imported
+    pgns = c2l.check_already_imported(pgns)
+    # Update the local 'database' with the requested games
+    c2l.update_db(pgns)
+    # Write the new PGNs to the monthly PGN document
+    c2l.update_local_pgns(pgns)
+    # Import the requested games to lichess.org
+    c2l.import_pgns(pgns)

@@ -31,13 +31,14 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -v, --verbose         show information about number of games and progress
+  -f [TYPE ...], --filter [TYPE ...]
+                        filter which game types are imported - space separated
+  -u, --utc             stop the script from converting date/time from UTC to local timezone
   -c, --current         import chess.com games from the current month to lichess.org
   -m YYYY/MM, --month YYYY/MM
                         import chess.com games from the specified month to lichess.org
   -r YYYY/MM YYYY/MM, --range YYYY/MM YYYY/MM
                         import chess.com games from months in the specified range to lichess.org
-  -f [TYPE ...], --filter [TYPE ...]
-                        filter which game types are imported - space separated
 ```
 
 ## Examples
