@@ -4,11 +4,14 @@ Programmatically import games played on chess.com to lichess.org via PGN text.
 
 I am really bad at chess and trying to be less bad at programming. I made this script as a little weekend project to practice the programming side of things.
 
-Using this script, you can import all games from chess.com into your lichess.org profile in the current month that the script is being run in, from a specified month, or from a range of months. I plan on implementing an option to maintain a local "database" in .csv format in order to make some fun graphs showing how bad at chess I am in fun and interesting ways. I might just uncover hidden patterns in how bad I am at chess. I made this to import my own chess.com games to lichess.org, but in theory you could import the games from any user you might like.
+Using this script, you can import all games from chess.com into your lichess.org profile in the current month that the script is being run in, from a specified month, or from a range of months. I have implemented a local "database" in .csv format in order to stop the script from trying to import games that are already on lichess.org and so that I can make some fun graphs showing how bad at chess I am in fun and interesting ways. I might just uncover hidden patterns in how bad I am at chess. In addition to the pseudo-database, the script now saves writes the full PGN text to a local text file. I made this to import my own chess.com games to lichess.org, but in theory you could import the games from any user you might like.
 
 Let me know if there are bugs or features you would actually want added here.
 
 P.S. If there are a lot of games, the script will take a while to run. I have limited it to one POST request every 7.5 seconds so as not to overload the lichess.org servers and raise a 429 error. I recommend running it with the -v/--verbose option in order to keep track of the progress.
+
+## To do
+Improve management of the local PGN text so that games from each month are split into documents... maybe. I've yet to decide if this is actually a good idea.
 
 ## Setup
 

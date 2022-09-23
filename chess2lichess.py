@@ -284,7 +284,7 @@ if __name__ == "__main__":
         "--utc",
         action="store_false",
         default=True,
-        help="stop the script from convert date/time from UTC to local timezone"
+        help="stop the script from converting date/time from UTC to local timezone"
     )
 
     modes = parser.add_mutually_exclusive_group(required=True)
