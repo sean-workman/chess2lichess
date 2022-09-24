@@ -241,13 +241,13 @@ class Chess2Lichess:
             print("Importing games from chess.com...")
         for pgn in pgn_list:
             data = {"pgn": pgn}
-            # response = requests.post(url=url, headers=headers, data=data)
-            # response.raise_for_status()
+            response = requests.post(url=url, headers=headers, data=data)
+            response.raise_for_status()
             games_imported += 1
             if self.verbose:
                 print(f"Imported {games_imported}/{n_games}")
-            # if games_imported != n_games:
-            #     sleep(7.5)
+            if games_imported != n_games:
+                sleep(7.5)
         if self.verbose:
             print("Finished importing games from chess.com")
 
