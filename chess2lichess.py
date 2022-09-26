@@ -1,8 +1,6 @@
 import argparse
-from calendar import monthrange
 import csv
 from datetime import date, datetime
-from urllib.error import HTTPError
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
 import os
@@ -56,7 +54,9 @@ class Chess2Lichess:
         """
         if not os.path.exists("pgn_database.csv"):
             with open("pgn_database.csv", "wt") as database:
-                print("Created local 'database' named pgn_database.csv in the current directory")
+                print(
+                    "Created local 'database' named pgn_database.csv in the current directory"
+                )
                 writer = csv.writer(database)
                 writer.writerow(
                     [
@@ -146,7 +146,7 @@ class Chess2Lichess:
             response.raise_for_status()
             pgn_accumulator += response.text.rstrip()
             pgn_accumulator += "\n\n\n"
-        
+
         pgn_list = pgn_accumulator.rstrip("\n\n\n").split("\n\n\n")
 
         return pgn_list
@@ -169,7 +169,7 @@ class Chess2Lichess:
         else:
             return filtered_pgn_list
 
-    def check_already_imported(self, fetched_pgns:list) -> list:
+    def check_already_imported(self, fetched_pgns: list) -> list:
         """
         Check local monthly PGN text document to see which games have already
         been imported. Return a sanitized list of PGNs that have not yet been
@@ -180,8 +180,12 @@ class Chess2Lichess:
             current_ids = [row[0] for row in reader]
         print(f"{len(fetched_pgns)} games requested for import")
         if len(current_ids) > 1:
-            unseen_pgns = [pgn for pgn in fetched_pgns if re.search(TAG_PATTERN, pgn).group("game_id") not in current_ids]
-            dont_import = len(fetched_pgns)-len(unseen_pgns)
+            unseen_pgns = [
+                pgn
+                for pgn in fetched_pgns
+                if re.search(TAG_PATTERN, pgn).group("game_id") not in current_ids
+            ]
+            dont_import = len(fetched_pgns) - len(unseen_pgns)
         else:
             unseen_pgns = fetched_pgns
             dont_import = 0
@@ -190,7 +194,9 @@ class Chess2Lichess:
             exit(1)
         else:
             if self.verbose:
-                print(f"{dont_import} of the {len(fetched_pgns)} requested games have already been imported")
+                print(
+                    f"{dont_import} of the {len(fetched_pgns)} requested games have already been imported"
+                )
             return unseen_pgns
 
     def update_db(self, pgn) -> None:
@@ -202,7 +208,9 @@ class Chess2Lichess:
             tags = re.search(TAG_PATTERN, pgn)
             game_id = tags.group("game_id")
             if self.convert_local:
-                game_date, game_time = self.convert_utc_to_local(tags.group("date"), tags.group("time"))
+                game_date, game_time = self.convert_utc_to_local(
+                    tags.group("date"), tags.group("time")
+                )
             else:
                 game_date, game_time = (tags.group("date"), tags.group("time"))
             white = tags.group("white")
@@ -213,8 +221,18 @@ class Chess2Lichess:
             termination = tags.group("termination")
 
             writer.writerow(
-            [game_id, game_date, game_time, white, white_elo, black, black_elo, time_control, termination]
-        )
+                [
+                    game_id,
+                    game_date,
+                    game_time,
+                    white,
+                    white_elo,
+                    black,
+                    black_elo,
+                    time_control,
+                    termination,
+                ]
+            )
 
     def update_local_pgns(self, pgn, last=False) -> None:
         """
@@ -222,9 +240,9 @@ class Chess2Lichess:
         """
         with open("local_pgns.txt", "a+") as file:
             if not last:
-                file.write(pgn+"\n\n\n")
+                file.write(pgn + "\n\n\n")
             else:
-                file.write(pgn+"\n\n")
+                file.write(pgn + "\n\n")
 
     def import_pgns(self, pgn_list: list) -> None:
         """
@@ -246,7 +264,7 @@ class Chess2Lichess:
             try:
                 requests.post(url=url, headers=headers, data=data)
                 games_imported += 1
-            except HTTPError:
+            except requests.exceptions.HTTPError:
                 print("Too many requests - pausing imports for one minute")
                 sleep(60)
                 requests.post(url=url, headers=headers, data=data)
@@ -296,7 +314,7 @@ if __name__ == "__main__":
         "--utc",
         action="store_false",
         default=True,
-        help="stop the script from converting date/time from UTC to local timezone"
+        help="stop the script from converting date/time from UTC to local timezone",
     )
 
     modes = parser.add_mutually_exclusive_group(required=True)
