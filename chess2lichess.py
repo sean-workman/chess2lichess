@@ -2,6 +2,7 @@ import argparse
 from calendar import monthrange
 import csv
 from datetime import date, datetime
+from urllib.error import HTTPError
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
 import os
@@ -192,37 +193,38 @@ class Chess2Lichess:
                 print(f"{dont_import} of the {len(fetched_pgns)} requested games have already been imported")
             return unseen_pgns
 
-    def update_db(self, pgns) -> None:
+    def update_db(self, pgn) -> None:
         """
         Update the local .csv "database" with PGN tags for each game being imported.
         """
         with open("pgn_database.csv", "a+") as database:
             writer = csv.writer(database)
-            for pgn in pgns:
-                tags = re.search(TAG_PATTERN, pgn)
-                game_id = tags.group("game_id")
-                if self.convert_local:
-                    game_date, game_time = self.convert_utc_to_local(tags.group("date"), tags.group("time"))
-                else:
-                    game_date, game_time = (tags.group("date"), tags.group("time"))
-                white = tags.group("white")
-                white_elo = tags.group("white_elo")
-                black_elo = tags.group("black_elo")
-                black = tags.group("black")
-                time_control = tags.group("time_control")
-                termination = tags.group("termination")
+            tags = re.search(TAG_PATTERN, pgn)
+            game_id = tags.group("game_id")
+            if self.convert_local:
+                game_date, game_time = self.convert_utc_to_local(tags.group("date"), tags.group("time"))
+            else:
+                game_date, game_time = (tags.group("date"), tags.group("time"))
+            white = tags.group("white")
+            white_elo = tags.group("white_elo")
+            black_elo = tags.group("black_elo")
+            black = tags.group("black")
+            time_control = tags.group("time_control")
+            termination = tags.group("termination")
 
-                writer.writerow(
+            writer.writerow(
             [game_id, game_date, game_time, white, white_elo, black, black_elo, time_control, termination]
         )
 
-    def update_local_pgns(self, pgns) -> None:
+    def update_local_pgns(self, pgn, last=False) -> None:
         """
         Update the local PGN text document with each game being imported.
         """
         with open("local_pgns.txt", "a+") as file:
-            for pgn in pgns:
+            if not last:
                 file.write(pgn+"\n\n\n")
+            else:
+                file.write(pgn+"\n\n")
 
     def import_pgns(self, pgn_list: list) -> None:
         """
@@ -241,9 +243,19 @@ class Chess2Lichess:
             print("Importing games from chess.com...")
         for pgn in pgn_list:
             data = {"pgn": pgn}
-            response = requests.post(url=url, headers=headers, data=data)
-            response.raise_for_status()
-            games_imported += 1
+            try:
+                requests.post(url=url, headers=headers, data=data)
+                games_imported += 1
+            except HTTPError:
+                print("Too many requests - pausing imports for one minute")
+                sleep(60)
+                requests.post(url=url, headers=headers, data=data)
+                games_imported += 1
+            self.update_db(pgn)
+            if pgn != pgn_list[-1]:
+                self.update_local_pgns(pgn)
+            else:
+                self.update_local_pgns(pgn, last=True)
             if self.verbose:
                 print(f"Imported {games_imported}/{n_games}")
             if games_imported != n_games:
@@ -330,9 +342,5 @@ if __name__ == "__main__":
 
     # Check to see which PGNs have already been imported
     pgns = c2l.check_already_imported(pgns)
-    # Update the local 'database' with the requested games
-    c2l.update_db(pgns)
-    # Write the new PGNs to the monthly PGN document
-    c2l.update_local_pgns(pgns)
     # Import the requested games to lichess.org
     c2l.import_pgns(pgns)
