@@ -22,14 +22,14 @@ TIME_CONTROL = {"rapid": "600", "blitz": "180", "bullet": "60"}
 # of information to store in the local "database".
 TAGS = [
     "(?s)",
-    '(White \"(?P<white>\S+)\")',
-    '(Black \"(?P<black>\S+)\")',
-    '(UTCDate \"(?P<date>\d+.\d+.\d+)\")',
-    '(UTCTime \"(?P<time>\d+:\d+:\d+)\")',
-    '(WhiteElo \"(?P<white_elo>\d+)\")',
-    '(BlackElo \"(?P<black_elo>\d+)\")',
-    '(TimeControl \"(?P<time_control>\d+[/\+\d+]{0,})\")',
-    '(Termination \"(?P<termination>(\S+\s){,10}\w+)\")',
+    '(White "(?P<white>\S+)")',
+    '(Black "(?P<black>\S+)")',
+    '(UTCDate "(?P<date>\d+.\d+.\d+)")',
+    '(UTCTime "(?P<time>\d+:\d+:\d+)")',
+    '(WhiteElo "(?P<white_elo>\d+)")',
+    '(BlackElo "(?P<black_elo>\d+)")',
+    '(TimeControl "(?P<time_control>\d+[/\+\d+]{0,})")',
+    '(Termination "(?P<termination>(\S+\s){,10}\w+)")',
     "(Link .+/(?P<game_id>\d+))",
 ]
 
