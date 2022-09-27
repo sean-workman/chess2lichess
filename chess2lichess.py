@@ -22,15 +22,15 @@ TIME_CONTROL = {"rapid": "600", "blitz": "180", "bullet": "60"}
 # of information to store in the local "database".
 TAGS = [
     "(?s)",
-    '(White "(?P<white>\S+)")',
-    '(Black "(?P<black>\S+)")',
-    '(UTCDate "(?P<date>\d+.\d+.\d+)")',
-    '(UTCTime "(?P<time>\d+:\d+:\d+)")',
-    '(WhiteElo "(?P<white_elo>\d+)")',
-    '(BlackElo "(?P<black_elo>\d+)")',
-    '(TimeControl "(?P<time_control>\d+[\+\d+]{0,3})")',
-    '(Termination "(?P<termination>(\S+\s){,10}\w+)")',
-    "(Link .+/live/(?P<game_id>\d+))",
+    '(White \"(?P<white>\S+)\")',
+    '(Black \"(?P<black>\S+)\")',
+    '(UTCDate \"(?P<date>\d+.\d+.\d+)\")',
+    '(UTCTime \"(?P<time>\d+:\d+:\d+)\")',
+    '(WhiteElo \"(?P<white_elo>\d+)\")',
+    '(BlackElo \"(?P<black_elo>\d+)\")',
+    '(TimeControl \"(?P<time_control>\d+[/\+\d+]{0,})\")',
+    '(Termination \"(?P<termination>(\S+\s){,10}\w+)\")',
+    "(Link .+/(?P<game_id>\d+))",
 ]
 
 TAG_PATTERN = re.compile(".+".join(TAGS))
@@ -357,7 +357,6 @@ if __name__ == "__main__":
     # Filter PGNs on time control if requested
     if args.filter:
         pgns = c2l.filter_pgns(pgns, args.filter)
-
     # Check to see which PGNs have already been imported
     pgns = c2l.check_already_imported(pgns)
     # Import the requested games to lichess.org
